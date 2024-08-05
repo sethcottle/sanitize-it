@@ -11,12 +11,18 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. Please see the
 // GNU General Public License for more details.
 
+console.log('Background script loaded');
+
 chrome.action.onClicked.addListener((tab) => {
+  console.log('Extension icon clicked');
   sanitizeAndUpdateUrl(tab);
 });
 
 function sanitizeAndUpdateUrl(tab) {
+  console.log('sanitizeAndUpdateUrl function called');
   let url = new URL(tab.url);
+  
+  console.log('Original URL:', url.toString());
   
   // Remove everything after '?'
   url.search = '';
@@ -30,19 +36,26 @@ function sanitizeAndUpdateUrl(tab) {
   url.hash = '';
   
   const sanitizedUrl = url.toString();
+  console.log('Sanitized URL:', sanitizedUrl);
   
   // Update the current tab with the sanitized URL
   chrome.tabs.update(tab.id, { url: sanitizedUrl }, () => {
+    console.log('Tab updated with sanitized URL');
     // Wait for the page to load before injecting the content script
     chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
       if (tabId === tab.id && info.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener);
         
+        console.log('Page loaded, injecting content script');
         // Inject content script to handle clipboard and notification
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
           function: notifyAndCopyToClipboard,
           args: [sanitizedUrl]
+        }).then(() => {
+          console.log('Content script injected successfully');
+        }).catch((error) => {
+          console.error('Error injecting content script:', error);
         });
       }
     });
@@ -50,11 +63,12 @@ function sanitizeAndUpdateUrl(tab) {
 }
 
 function notifyAndCopyToClipboard(sanitizedUrl) {
+  console.log('notifyAndCopyToClipboard function called');
   // Copy to clipboard
   navigator.clipboard.writeText(sanitizedUrl).then(() => {
     console.log('URL copied to clipboard');
   }).catch(err => {
-    console.error('Failed to copy: ', err);
+    console.error('Failed to copy:', err);
   });
 
   // Create and show notification
@@ -76,6 +90,7 @@ function notifyAndCopyToClipboard(sanitizedUrl) {
   `;
 
   document.body.appendChild(notification);
+  console.log('Notification added to the page');
 
   // Remove notification after 3 seconds
   setTimeout(() => {
@@ -83,6 +98,9 @@ function notifyAndCopyToClipboard(sanitizedUrl) {
     notification.style.transition = 'opacity 0.5s';
     setTimeout(() => {
       document.body.removeChild(notification);
+      console.log('Notification removed from the page');
     }, 500);
   }, 3000);
 }
+
+console.log('Background script setup complete');
