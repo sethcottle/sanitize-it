@@ -46,58 +46,124 @@ function sanitizeAndUpdateUrl(tab) {
       if (tabId === tab.id && info.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener);
         
-        console.log('Page loaded, injecting content script');
-        // Inject content script to handle clipboard and notification
+        console.log('Page loaded, copying to clipboard');
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          function: notifyAndCopyToClipboard,
+          func: copyToClipboard,
           args: [sanitizedUrl]
-        }).then(() => {
-          console.log('Content script injected successfully');
+        }).then((results) => {
+          console.log('Clipboard operation completed, showing notification');
+          const copySucceeded = results[0].result;
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: showNotification,
+            args: [
+              copySucceeded ? 'URL sanitized and copied to clipboard!' : 'URL sanitized, but copying to clipboard failed.',
+              !copySucceeded  // isError flag
+            ]
+          });
         }).catch((error) => {
-          console.error('Error injecting content script:', error);
+          console.error('Error during clipboard operation:', error);
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: showNotification,
+            args: ['URL sanitized, but an error occurred while trying to copy.', true]  // isError flag
+          });
         });
       }
     });
   });
 }
 
-function notifyAndCopyToClipboard(sanitizedUrl) {
-  console.log('notifyAndCopyToClipboard function called');
-  // Copy to clipboard
-  navigator.clipboard.writeText(sanitizedUrl).then(() => {
-    console.log('URL copied to clipboard');
-  }).catch(err => {
-    console.error('Failed to copy:', err);
-  });
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => {
+      console.log('URL copied to clipboard using Clipboard API');
+      return true;
+    }).catch(err => {
+      console.error('Failed to copy using Clipboard API:', err);
+      return fallbackCopyToClipboard(text);
+    });
+  } else {
+    console.log('Clipboard API not available, using fallback method');
+    return fallbackCopyToClipboard(text);
+  }
+}
 
-  // Create and show notification
-  const notification = document.createElement('div');
-  notification.textContent = 'URL sanitized and copied to clipboard!';
-  notification.style.cssText = `
+function fallbackCopyToClipboard(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";  // Avoid scrolling to bottom
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand('copy');
+    const msg = successful ? 'successful' : 'unsuccessful';
+    console.log('Fallback: Copying text command was ' + msg);
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback: Oops, unable to copy', err);
+    document.body.removeChild(textArea);
+    return false;
+  }
+}
+
+function showNotification(message, isError = false) {
+  console.log('Showing notification:', message);
+  
+  // Create container for shadow DOM
+  const container = document.createElement('div');
+  container.style.cssText = `
     position: fixed;
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: #327834;
-    color: white;
-    padding: 16px;
-    border-radius: 4px;
-    z-index: 10000;
-    font-family: Arial, sans-serif;
-    font-size: 16px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 2147483647;
   `;
-
-  document.body.appendChild(notification);
+  
+  // Create shadow DOM
+  const shadow = container.attachShadow({mode: 'closed'});
+  
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.textContent = message;
+  
+  // Create style element
+  const style = document.createElement('style');
+  style.textContent = `
+    .notification {
+      background-color: ${isError ? '#FFC387' : '#327834'};
+      color: ${isError ? 'black' : 'white'};
+      padding: 16px;
+      border-radius: 4px;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      min-width: 200px;
+      max-width: 80%;
+    }
+  `;
+  
+  // Add style and notification to shadow DOM
+  shadow.appendChild(style);
+  shadow.appendChild(notification);
+  
+  // Add class to notification
+  notification.className = 'notification';
+  
+  // Add container to body
+  document.body.appendChild(container);
   console.log('Notification added to the page');
 
-  // Remove notification after 3 seconds
   setTimeout(() => {
     notification.style.opacity = '0';
     notification.style.transition = 'opacity 0.5s';
     setTimeout(() => {
-      document.body.removeChild(notification);
+      document.body.removeChild(container);
       console.log('Notification removed from the page');
     }, 500);
   }, 3000);
