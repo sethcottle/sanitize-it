@@ -20,7 +20,7 @@ chrome.action.onClicked.addListener((tab) => {
 });
 ```
 
-Sets up an event listener that triggers when the user clicks the extension icon. It logs the click and calls the sanitizeAndUpdateUrl function with the current tab as an argument.
+Sets up an event listener that triggers when the user clicks the extension icon. It logs the click and calls the `sanitizeAndUpdateUrl` function with the current tab as an argument.
 
 ### URL Sanitization Function
 
@@ -120,11 +120,11 @@ Sanitize It runs completely locally in your browser. It does not collect any ana
 
 Sanitize It is available in the Google Chrome Web Store, the Microsoft Edge Add-ons Store, macOS App Store for Safari, and available for manual download and installation.
 
-[![Get on the Google Chrome Web Store](https://cdn.cottle.cloud/tabcloser/buttons/button-webstore.svg)](#)
+[![Get on the Google Chrome Web Store](https://cdn.cottle.cloud/tabcloser/buttons/button-webstore.svg)](https://chromewebstore.google.com/detail/sanitize-it/cdihhogfljcidhcpjdhhelbmbhbeafgd)
 
 [![Get on the Microsoft Edge Store](https://cdn.cottle.cloud/tabcloser/buttons/button-edge.svg)](#)
 
-[![Get on the macOS App Store](https://cdn.cottle.cloud/tabcloser/buttons/button-macos.svg)](#)
+[![Get on the macOS App Store](https://cdn.cottle.cloud/tabcloser/buttons/button-macos.svg)](https://apps.apple.com/us/app/sanitize-it/id6612008481)
 
 [![Download the Latest GitHub Release](https://cdn.cottle.cloud/tabcloser/buttons/button-latest.svg)](https://github.com/sethcottle/sanitize-it/zipball/main)
 
