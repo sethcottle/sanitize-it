@@ -122,7 +122,7 @@ Sanitize It is available in the Google Chrome Web Store, the Microsoft Edge Add-
 
 [![Get on the Google Chrome Web Store](https://cdn.cottle.cloud/tabcloser/buttons/button-webstore.svg)](https://chromewebstore.google.com/detail/sanitize-it/cdihhogfljcidhcpjdhhelbmbhbeafgd)
 
-[![Get on the Microsoft Edge Store](https://cdn.cottle.cloud/tabcloser/buttons/button-edge.svg)](#)
+[![Get on the Microsoft Edge Store](https://cdn.cottle.cloud/tabcloser/buttons/button-edge.svg)](https://microsoftedge.microsoft.com/addons/detail/sanitize-it/agaghmjjnhddaoneohbdgmemdmekanph)
 
 [![Get on the macOS App Store](https://cdn.cottle.cloud/tabcloser/buttons/button-macos.svg)](https://apps.apple.com/us/app/sanitize-it/id6612008481)
 
