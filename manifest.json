@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sanitize It",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Remove tracking information from the current page and automatically copy the URL to your clipboard.",
   "permissions": [
     "activeTab",
@@ -23,5 +23,19 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "commands": {
+    "sanitize-copy": {
+      "suggested_key": {
+        "default": "Alt+Shift+X"
+      },
+      "description": "Sanitize URL and copy to clipboard"
+    },
+    "sanitize-refresh": {
+      "suggested_key": {
+        "default": "Alt+Shift+R"
+      },
+      "description": "Sanitize URL, copy to clipboard, and refresh"
+    }
   }
 }

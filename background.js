@@ -11,22 +11,35 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. Please see the
 // GNU General Public License for more details.
 
+// Cross-browser namespace: Chrome <144 uses chrome.*, Firefox and Chrome 144+ use browser.*
+const api = typeof browser !== 'undefined' ? browser : chrome;
+
 console.log('Background script loaded');
 
-chrome.action.onClicked.addListener((tab) => {
-  console.log('Extension icon clicked');
-  sanitizeAndUpdateUrl(tab);
+// Icon click: copy only (Firefox Shift+Click = copy + refresh)
+api.action.onClicked.addListener((tab, info) => {
+  const shouldRefresh = !!(info && info.modifiers && info.modifiers.includes('Shift'));
+  console.log('Extension icon clicked' + (shouldRefresh ? ' (Shift+Click)' : ''));
+  sanitize(tab, shouldRefresh);
 });
 
-function sanitizeAndUpdateUrl(tab) {
-  console.log('sanitizeAndUpdateUrl function called');
+// Keyboard shortcuts (work on both Chrome and Firefox)
+api.commands.onCommand.addListener((command) => {
+  api.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+    if (tabs[0]) {
+      const shouldRefresh = command === 'sanitize-refresh';
+      console.log('Command: ' + command);
+      sanitize(tabs[0], shouldRefresh);
+    }
+  });
+});
+
+function sanitize(tab, shouldRefresh) {
   let url = new URL(tab.url);
-  
-  console.log('Original URL:', url.toString());
-  
+
   // Remove everything after '?'
   url.search = '';
-  
+
   // Remove ref parameters from the pathname
   let newPathname = url.pathname.replace(/\/ref\/.*$/, '');
   newPathname = newPathname.replace(/\/ref=.*$/, '');
@@ -34,139 +47,134 @@ function sanitizeAndUpdateUrl(tab) {
 
   // Remove hash
   url.hash = '';
-  
+
   const sanitizedUrl = url.toString();
   console.log('Sanitized URL:', sanitizedUrl);
-  
-  // Update the current tab with the sanitized URL
-  chrome.tabs.update(tab.id, { url: sanitizedUrl }, () => {
-    console.log('Tab updated with sanitized URL');
-    // Wait for the page to load before injecting the content script
-    chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-      if (tabId === tab.id && info.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
-        
-        console.log('Page loaded, copying to clipboard');
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: copyToClipboard,
-          args: [sanitizedUrl]
-        }).then((results) => {
-          console.log('Clipboard operation completed, showing notification');
-          const copySucceeded = results[0].result;
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: showNotification,
-            args: [
-              copySucceeded ? 'URL sanitized and copied to clipboard!' : 'URL sanitized, but copying to clipboard failed.',
-              !copySucceeded  // isError flag
-            ]
-          });
-        }).catch((error) => {
-          console.error('Error during clipboard operation:', error);
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: showNotification,
-            args: ['URL sanitized, but an error occurred while trying to copy.', true]  // isError flag
-          });
-        });
-      }
-    });
+
+  // Inject script on the CURRENT page while activeTab permission is still valid.
+  // Firefox revokes activeTab after navigation, so we copy + toast first, then navigate.
+  api.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: copyAndNotify,
+    args: [sanitizedUrl, shouldRefresh]
   });
 }
 
-function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text).then(() => {
-      console.log('URL copied to clipboard using Clipboard API');
-      return true;
-    }).catch(err => {
-      console.error('Failed to copy using Clipboard API:', err);
-      return fallbackCopyToClipboard(text);
-    });
-  } else {
-    console.log('Clipboard API not available, using fallback method');
-    return fallbackCopyToClipboard(text);
-  }
-}
+// Single injected function that handles clipboard + notification in the page context.
+// This avoids serializing Promise results back to the background script, which
+// Firefox cannot do reliably with scripting.executeScript.
+function copyAndNotify(sanitizedUrl, shouldRefresh) {
 
-function fallbackCopyToClipboard(text) {
-  const textArea = document.createElement("textarea");
-  textArea.value = text;
-  textArea.style.position = "fixed";  // Avoid scrolling to bottom
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-
-  try {
-    const successful = document.execCommand('copy');
-    const msg = successful ? 'successful' : 'unsuccessful';
-    console.log('Fallback: Copying text command was ' + msg);
-    document.body.removeChild(textArea);
-    return successful;
-  } catch (err) {
-    console.error('Fallback: Oops, unable to copy', err);
-    document.body.removeChild(textArea);
-    return false;
-  }
-}
-
-function showNotification(message, isError = false) {
-  console.log('Showing notification:', message);
-  
-  // Create container for shadow DOM
-  const container = document.createElement('div');
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 2147483647;
-  `;
-  
-  // Create shadow DOM
-  const shadow = container.attachShadow({mode: 'closed'});
-  
-  // Create notification element
-  const notification = document.createElement('div');
-  notification.textContent = message;
-  
-  // Create style element
-  const style = document.createElement('style');
-  style.textContent = `
-    .notification {
-      background-color: ${isError ? '#FFC387' : '#327834'};
-      color: ${isError ? 'black' : 'white'};
-      padding: 16px;
-      border-radius: 4px;
-      font-family: Arial, sans-serif;
-      font-size: 16px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      text-align: center;
-      min-width: 200px;
-      max-width: 80%;
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(() => {
+        console.log('URL copied to clipboard using Clipboard API');
+        return true;
+      }).catch(err => {
+        console.error('Failed to copy using Clipboard API:', err);
+        return fallbackCopy(text);
+      });
+    } else {
+      console.log('Clipboard API not available, using fallback method');
+      return Promise.resolve(fallbackCopy(text));
     }
-  `;
-  
-  // Add style and notification to shadow DOM
-  shadow.appendChild(style);
-  shadow.appendChild(notification);
-  
-  // Add class to notification
-  notification.className = 'notification';
-  
-  // Add container to body
-  document.body.appendChild(container);
-  console.log('Notification added to the page');
+  }
 
-  setTimeout(() => {
-    notification.style.opacity = '0';
-    notification.style.transition = 'opacity 0.5s';
+  function fallbackCopy(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      const successful = document.execCommand('copy');
+      console.log('Fallback: Copying text command was ' + (successful ? 'successful' : 'unsuccessful'));
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      console.error('Fallback: Unable to copy', err);
+      document.body.removeChild(textArea);
+      return false;
+    }
+  }
+
+  function showNotification(message, isError) {
+    const container = document.createElement('div');
+    container.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483647;
+      pointer-events: none;
+    `;
+
+    const shadow = container.attachShadow({mode: 'closed'});
+
+    const notification = document.createElement('div');
+    notification.textContent = message;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes toast-in {
+        from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes toast-out {
+        from { opacity: 1; transform: translateY(0) scale(1); }
+        to { opacity: 0; transform: translateY(-8px) scale(0.96); }
+      }
+      .notification {
+        background: ${isError ? 'rgba(60, 40, 20, 0.88)' : 'rgba(20, 40, 20, 0.88)'};
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        backdrop-filter: blur(20px) saturate(180%);
+        color: ${isError ? '#FFC387' : '#6FCF6A'};
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        line-height: 1.4;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.12), inset 0 0.5px 0 rgba(255,255,255,0.08);
+        border: 0.5px solid ${isError ? 'rgba(255,195,135,0.15)' : 'rgba(111,207,106,0.15)'};
+        text-align: center;
+        animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      .notification.dismiss {
+        animation: toast-out 0.35s cubic-bezier(0.4, 0, 1, 1) forwards;
+      }
+    `;
+
+    shadow.appendChild(style);
+    shadow.appendChild(notification);
+    notification.className = 'notification';
+    document.body.appendChild(container);
+
     setTimeout(() => {
-      document.body.removeChild(container);
-      console.log('Notification removed from the page');
-    }, 500);
-  }, 3000);
+      notification.classList.add('dismiss');
+      setTimeout(() => {
+        document.body.removeChild(container);
+      }, 350);
+    }, 3000);
+  }
+
+  // Run clipboard, show toast, then optionally navigate
+  copyToClipboard(sanitizedUrl).then((success) => {
+    const msg = success
+      ? (shouldRefresh ? 'Sanitized and copied! Refreshing...' : 'Sanitized URL copied to clipboard!')
+      : 'URL sanitized, but copying to clipboard failed.';
+    showNotification(msg, !success);
+  }).catch(() => {
+    showNotification('URL sanitized, but an error occurred while trying to copy.', true);
+  }).finally(() => {
+    if (shouldRefresh) {
+      setTimeout(() => {
+        location.replace(sanitizedUrl);
+      }, 1500);
+    }
+  });
 }
 
 console.log('Background script setup complete');

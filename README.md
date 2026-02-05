@@ -2,119 +2,77 @@
 
 # Sanitize It
 
-Sanitize It allows you to quickly remove tracking information from the current page and automatically copy the URL to your clipboard with a single click.
+Sanitize It allows you to quickly remove tracking information from the current page and automatically copy the URL to your clipboard with a single click. Available for Chrome, Firefox, Edge, and Safari.
 
-## Does Sanitize It work automatically?
-No, you'll need to manually run Sanitize It when you want to clean up the URL of the current page you're on. Once you run Sanitize It, the sanitized URL will automatically copy to your clipboard for quick and easy sharing.
+## How It Works
+
+Click the Sanitize It icon on any page to strip tracking parameters and copy the clean URL to your clipboard. The page stays as-is — you just get a clean link to share.
+
+Want to also refresh the page with the clean URL? Use **Shift+Click** (Firefox) or the keyboard shortcut.
 
 ![CleanShot 2024-08-05 at 22 12 19@2x](https://github.com/user-attachments/assets/3532bcce-1974-4915-8b28-11cdeb7a39d8)
 
-## Breaking Down Sanitize It
+## Keyboard Shortcuts
 
-### Event Listener for Extension Icon Click
+Sanitize It includes keyboard shortcuts for power users. These work on all supported browsers.
 
-```javascript
-chrome.action.onClicked.addListener((tab) => {
-  console.log('Extension icon clicked');
-  sanitizeAndUpdateUrl(tab);
-});
+| Action | macOS | Windows / Linux |
+|---|---|---|
+| **Sanitize + Copy** | `Option + Shift + X` | `Alt + Shift + X` |
+| **Sanitize + Copy + Refresh** | `Option + Shift + R` | `Alt + Shift + R` |
+
+You can customize these shortcuts:
+- **Chrome:** `chrome://extensions/shortcuts`
+- **Firefox:** `about:addons` → gear icon → Manage Extension Shortcuts
+- **Edge:** `edge://extensions/shortcuts`
+
+## What Gets Removed
+
+Sanitize It strips the following from URLs:
+- **Query parameters** — everything after `?` (e.g., `?utm_source=...`, `?ref=...`, `?fbclid=...`)
+- **Ref paths** — `/ref/...` and `/ref=...` segments in the URL path (common on Amazon)
+- **Hash fragments** — everything after `#`
+
+## Browser Support
+
+Sanitize It 2.0 is a single codebase that supports both Chrome and Firefox (and Chromium-based browsers like Edge, Brave, etc.).
+
+| Feature | Chrome / Edge | Firefox |
+|---|---|---|
+| Click to sanitize + copy | Yes | Yes |
+| Shift+Click to refresh | No (Chrome limitation) | Yes |
+| Keyboard shortcuts | Yes | Yes |
+| Minimum version | Chrome 88+ | Firefox 121+ |
+
+### Building for Each Browser
+
+Sanitize It uses a build script to produce browser-specific packages:
+
+```bash
+./build.sh
 ```
 
-Sets up an event listener that triggers when the user clicks the extension icon. It logs the click and calls the `sanitizeAndUpdateUrl` function with the current tab as an argument.
+This creates:
+- `dist/chrome/` — Uses `service_worker` in the manifest
+- `dist/firefox/` — Uses `scripts` in the manifest with `browser_specific_settings` for Gecko
 
-### URL Sanitization Function
-
-```javascript
-function sanitizeAndUpdateUrl(tab) {
-```
-
-This function takes a tab object as its parameter, which represents the current browser tab.
-
-```javascript
-let url = new URL(tab.url);
-```
-
-Creates a new `URL` object from the current tab's URL. This allows easy manipulation of different parts of the URL.
-
-```javascript
-url.search = '';
-```
-
-Sets the `search` property of the URL (everything after and including the '?') to an empty string, effectively removing all query parameters.
-
-```javascript
-let newPathname = url.pathname.replace(/\/ref\/.*$/, '');
-newPathname = newPathname.replace(/\/ref=.*$/, '');
-url.pathname = newPathname;
-```
-
-Removes '/ref/' or '/ref=' and everything after it from the pathname. This handles cases where 'ref' parameters are part of the path rather than query parameters.
-
-```javascript
-url.hash = '';
-```
-
-Removes the hash (fragment identifier) from the URL.
-
-```javascript
-const sanitizedUrl = url.toString();
-console.log('Sanitized URL:', sanitizedUrl);
-```
-
-Converts the modified URL object back to a string.
-
-```javascript
-chrome.tabs.update(tab.id, { url: sanitizedUrl }, () => {
-  // ... (callback function)
-});
-```
-
-Uses Chrome's tabs API to update the current tab with the sanitized URL.
-
-```javascript
-chrome.scripting.executeScript({
-  target: { tabId: tab.id },
-  function: notifyAndCopyToClipboard,
-  args: [sanitizedUrl]
-}).then(() => {
-  console.log('Content script injected successfully');
-}).catch((error) => {
-  console.error('Error injecting content script:', error);
-});
-```
-
-Once the page is loaded, this injects the `notifyAndCopyToClipboard` function as a content script, it passes the sanitized URL as an argument to this function.
-
-```javascript
-chrome.tabs.onUpdated.removeListener(listener);
-```
-
-Removes the update listener to prevent memory leaks and unnecessary processing.
-
-### Notification and Clipboard Function
-
-```javascript
-function notifyAndCopyToClipboard(sanitizedUrl) {
-  // ... (function body)
-}
-```
-
-This copies the sanitized URL to the clipboard abd creates and displays a notification to inform the user that the URL has been sanitized and copied.
+The JavaScript is identical across both builds. Only the `manifest.json` differs.
 
 ## Requested Permissions
+
 Sanitize It requests a few permissions in the `manifest.json` file.
 
 `activeTab` allows the extension to access the currently active tab when the user invokes the extension. This permission is used to access and modify the URL of the current tab when the user clicks the extension icon.
 
-`scripting` allows the extension to inject and execute scripts in web pages. This permission is used to inject the `notifyAndCopyToClipboard` function as a content script into the active tab after sanitizing the URL.
+`scripting` allows the extension to inject and execute scripts in web pages. This permission is used to inject the clipboard and notification functions as a content script into the active tab after sanitizing the URL.
 
-`clipboardWrite` allows the extension to write data to the system clipboard. This permission is used in the `notifyAndCopyToClipboard` function to copy the sanitized URL to the user's clipboard.
+`clipboardWrite` allows the extension to write data to the system clipboard. This permission is used to copy the sanitized URL to the user's clipboard.
 
-`tabs` allows the extension access to the `chrome.tabs` API, allowing it to interact with the browser's tab system. This permission is used to update the current tab's URL with the sanitized version and to listen for tab update events to know when the new page has finished loading.
+`tabs` allows the extension access to the tabs API, allowing it to interact with the browser's tab system. This permission is used to query the active tab for keyboard shortcut commands.
 
 #### Privacy
 
-Sanitize It runs completely locally in your browser. It does not collect any analytics, it does not store any information about your tabs or browser history, it does not send any data back for processing or analysis. Your data is yours and yours alone. 
+Sanitize It runs completely locally in your browser. It does not collect any analytics, it does not store any information about your tabs or browser history, it does not send any data back for processing or analysis. Your data is yours and yours alone.
 
 ## Installing Sanitize It
 
@@ -129,10 +87,13 @@ Sanitize It is available in the Google Chrome Web Store, the Microsoft Edge Add-
 [![Download the Latest GitHub Release](https://cdn.cottle.cloud/tabcloser/buttons/button-latest.svg)](https://github.com/sethcottle/sanitize-it/zipball/main)
 
 #### For Chrome
-Download the latest release and unzip it. Then navigate to `chrome://extensions/` and enable "Developer mode" using the toggle in the top right corner. Upload the extension manually by pressing "Load unpacked" and selecting the unzipped TabCloser folder.
+Download the latest release and unzip it. Then navigate to `chrome://extensions/` and enable "Developer mode" using the toggle in the top right corner. Upload the extension manually by pressing "Load unpacked" and selecting the unzipped folder.
+
+#### For Firefox
+Download the latest release and unzip it. Navigate to `about:debugging#/runtime/this-firefox` and click "Load Temporary Add-on", then select `manifest.json` from the `dist/firefox/` folder. For permanent installation, install from Firefox Add-ons (AMO).
 
 #### For Edge
-Download the latest release and unzip it. Then navigate to `edge://extensions/` and enable "Developer mode" in the left sidebar, it's near the bottom. Upload the extension manually by pressing "Load unpacked" and selecting the unzipped TabCloser folder.
+Download the latest release and unzip it. Then navigate to `edge://extensions/` and enable "Developer mode" in the left sidebar, it's near the bottom. Upload the extension manually by pressing "Load unpacked" and selecting the unzipped folder.
 
 #### For Safari
 `sanitize-it-1.3.2-macos` is available for download in the latest release. You can unzip this and drag Sanitize It.app to your Applications folder. Sanitize It.app was created using Xcode and signed for Direct Distribution, however there are a few steps you'll need to take to enable it. Once you install Sanitize It you'll need to launch Safari and go to `Safari` > `Settings` > `Advanced` and check `Show features for web developers`. Once you've done that, go to the Developer tab and enable `Allow unsigned extensions`. [Need help? Watch the installation video from my other extension, TabCloser](https://youtu.be/ZKSxBJY_g7c?si=7oH_BDfJDnXYTIY3).
@@ -154,11 +115,11 @@ Signing up through these services through these affiliate links is also a good w
 [![Try Fathom Analytics](https://cdn.cottle.cloud/tabcloser/buttons/button-fa.svg)](https://usefathom.com/ref/EQVZMV)
 
 ## Thanks
-Thanks to [Ryan Cuppernull](https://github.com/proxemics) for inspiring this extension!
+Thanks to [Ryan Cuppernull](https://github.com/proxemics) for inspiring Sanitize It and for his help implementing Firefox support for this extension!
 
 ## License
 
-Copyright (C) 2024 Seth Cottle
+Copyright (C) 2024--2026 Seth Cottle
 
 Sanitize It is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
