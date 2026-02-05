@@ -50,12 +50,16 @@ jobs:
           cd dist/chrome && zip -r "../../sanitize-it-chrome-v${{ inputs.version }}.zip" . && cd ../..
           cd dist/firefox && zip -r "../../sanitize-it-firefox-v${{ inputs.version }}.zip" . && cd ../..
 
-      - name: Commit version bump
+      - name: Commit version bump and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git commit -m "Bump version to ${{ inputs.version }}"
+          if git diff --cached --quiet; then
+            echo "Version already set to ${{ inputs.version }}, skipping commit"
+          else
+            git commit -m "Bump version to ${{ inputs.version }}"
+          fi
           git tag "v${{ inputs.version }}"
           git push origin HEAD --tags
 
