@@ -16,6 +16,14 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 
 console.log('Background script loaded');
 
+// Open welcome page on first install; set uninstall survey URL
+api.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    api.tabs.create({ url: 'https://tinyextensions.com/sanitizeit-howto' });
+  }
+});
+api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanitizeit');
+
 // Icon click: copy only (Firefox Shift+Click = copy + refresh)
 api.action.onClicked.addListener((tab, info) => {
   const shouldRefresh = !!(info && info.modifiers && info.modifiers.includes('Shift'));
