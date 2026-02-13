@@ -3,32 +3,40 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 
 document.addEventListener('DOMContentLoaded', () => {
   const radios = document.querySelectorAll('input[name="defaultAction"]');
+  const smartModeToggle = document.getElementById('smartMode');
   const saveIndicator = document.getElementById('saveIndicator');
   let hideTimeout;
 
-  // Load current setting
-  api.storage.sync.get({ defaultAction: 'copy' }).then((result) => {
+  function showSaved() {
+    clearTimeout(hideTimeout);
+    saveIndicator.classList.remove('hiding');
+    saveIndicator.classList.add('visible');
+
+    hideTimeout = setTimeout(() => {
+      saveIndicator.classList.remove('visible');
+      saveIndicator.classList.add('hiding');
+      setTimeout(() => saveIndicator.classList.remove('hiding'), 300);
+    }, 1500);
+  }
+
+  // Load current settings
+  api.storage.sync.get({ defaultAction: 'copy', smartMode: true }).then((result) => {
     const radio = document.querySelector(
       'input[name="defaultAction"][value="' + result.defaultAction + '"]'
     );
     if (radio) radio.checked = true;
+    smartModeToggle.checked = result.smartMode;
   });
 
-  // Save on change
+  // Save default action on change
   radios.forEach((radio) => {
     radio.addEventListener('change', (e) => {
-      api.storage.sync.set({ defaultAction: e.target.value }).then(() => {
-        // Show save indicator
-        clearTimeout(hideTimeout);
-        saveIndicator.classList.remove('hiding');
-        saveIndicator.classList.add('visible');
-
-        hideTimeout = setTimeout(() => {
-          saveIndicator.classList.remove('visible');
-          saveIndicator.classList.add('hiding');
-          setTimeout(() => saveIndicator.classList.remove('hiding'), 300);
-        }, 1500);
-      });
+      api.storage.sync.set({ defaultAction: e.target.value }).then(showSaved);
     });
+  });
+
+  // Save smart mode on change
+  smartModeToggle.addEventListener('change', () => {
+    api.storage.sync.set({ smartMode: smartModeToggle.checked }).then(showSaved);
   });
 });

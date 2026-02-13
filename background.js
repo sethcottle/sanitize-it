@@ -28,11 +28,11 @@ api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanit
 api.action.onClicked.addListener((tab, info) => {
   const shiftHeld = !!(info && info.modifiers && info.modifiers.includes('Shift'));
 
-  api.storage.sync.get({ defaultAction: 'copy' }).then((result) => {
+  api.storage.sync.get({ defaultAction: 'copy', smartMode: true }).then((result) => {
     const defaultIsRefresh = result.defaultAction === 'copyRefresh';
     const shouldRefresh = shiftHeld ? !defaultIsRefresh : defaultIsRefresh;
     console.log('Extension icon clicked (default=' + result.defaultAction + (shiftHeld ? ', Shift' : '') + ')');
-    sanitize(tab, shouldRefresh);
+    sanitize(tab, shouldRefresh, result.smartMode);
   });
 });
 
@@ -42,16 +42,53 @@ api.commands.onCommand.addListener((command) => {
     if (tabs[0]) {
       const shouldRefresh = command === 'sanitize-refresh';
       console.log('Command: ' + command);
-      sanitize(tabs[0], shouldRefresh);
+      api.storage.sync.get({ smartMode: true }).then((result) => {
+        sanitize(tabs[0], shouldRefresh, result.smartMode);
+      });
     }
   });
 });
 
-function sanitize(tab, shouldRefresh) {
-  let url = new URL(tab.url);
+// Site-specific allowlists: only these query params are preserved (everything else is stripped).
+// Sites not listed here get full aggressive stripping (all query params removed).
+const SITE_RULES = {
+  'www.youtube.com':   ['v', 'list', 'index', 't', 'search_query'],
+  'youtube.com':       ['v', 'list', 'index', 't', 'search_query'],
+  'youtu.be':          ['t'],
+  'music.youtube.com': ['v', 'list', 'index', 't'],
+  'www.google.com':    ['q', 'tbm', 'tbs', 'udm'],
+  'google.com':        ['q', 'tbm', 'tbs', 'udm'],
+  'search.yahoo.com':  ['p'],
+  'www.bing.com':      ['q'],
+  'duckduckgo.com':    ['q'],
+  'kagi.com':          ['q', 'l', 'r', 'order', 'dr', 'verbatim'],
+  'www.amazon.com':    ['dp', 's', 'k'],
+  'www.amazon.co.uk':  ['dp', 's', 'k'],
+};
 
-  // Remove everything after '?'
-  url.search = '';
+function sanitize(tab, shouldRefresh, smartMode) {
+  let url = new URL(tab.url);
+  const originalUrl = tab.url;
+  const hostname = url.hostname;
+  const hasRules = SITE_RULES.hasOwnProperty(hostname);
+  let usedSmartMode = false;
+
+  if (smartMode !== false && hasRules) {
+    // Keep only allowlisted params for this site
+    usedSmartMode = true;
+    const allowed = SITE_RULES[hostname];
+    const filtered = new URLSearchParams();
+    for (const [key, value] of url.searchParams) {
+      if (allowed.includes(key)) {
+        filtered.set(key, value);
+      }
+    }
+    const qs = filtered.toString();
+    url.search = qs ? '?' + qs : '';
+  } else {
+    // Aggressive: strip all query params
+    url.search = '';
+  }
 
   // Remove ref parameters from the pathname
   let newPathname = url.pathname.replace(/\/ref\/.*$/, '');
@@ -62,6 +99,7 @@ function sanitize(tab, shouldRefresh) {
   url.hash = '';
 
   const sanitizedUrl = url.toString();
+  const wasChanged = sanitizedUrl !== originalUrl;
   console.log('Sanitized URL:', sanitizedUrl);
 
   // Inject script on the CURRENT page while activeTab permission is still valid.
@@ -69,14 +107,14 @@ function sanitize(tab, shouldRefresh) {
   api.scripting.executeScript({
     target: { tabId: tab.id },
     func: copyAndNotify,
-    args: [sanitizedUrl, shouldRefresh]
+    args: [sanitizedUrl, shouldRefresh, usedSmartMode, wasChanged]
   });
 }
 
 // Single injected function that handles clipboard + notification in the page context.
 // This avoids serializing Promise results back to the background script, which
 // Firefox cannot do reliably with scripting.executeScript.
-function copyAndNotify(sanitizedUrl, shouldRefresh) {
+function copyAndNotify(sanitizedUrl, shouldRefresh, usedSmartMode, wasChanged) {
 
   function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -175,9 +213,16 @@ function copyAndNotify(sanitizedUrl, shouldRefresh) {
 
   // Run clipboard, show toast, then optionally navigate
   copyToClipboard(sanitizedUrl).then((success) => {
-    const msg = success
-      ? (shouldRefresh ? 'Sanitized and copied! Refreshing...' : 'Sanitized URL copied to clipboard!')
-      : 'URL sanitized, but copying to clipboard failed.';
+    let msg;
+    if (!success) {
+      msg = 'URL sanitized, but copying to clipboard failed.';
+    } else if (!wasChanged) {
+      msg = shouldRefresh ? 'URL already clean, copied! Refreshing...' : 'URL already clean, copied to clipboard!';
+    } else if (usedSmartMode) {
+      msg = shouldRefresh ? 'Copied! (tracking removed, kept essential params) Refreshing...' : 'Copied! (tracking removed, kept essential params)';
+    } else {
+      msg = shouldRefresh ? 'Sanitized and copied! Refreshing...' : 'Sanitized URL copied to clipboard!';
+    }
     showNotification(msg, !success);
   }).catch(() => {
     showNotification('URL sanitized, but an error occurred while trying to copy.', true);
