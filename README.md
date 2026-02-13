@@ -6,9 +6,11 @@ Sanitize It allows you to quickly remove tracking information from the current p
 
 ## How It Works
 
-Click the Sanitize It icon on any page to strip tracking parameters and copy the clean URL to your clipboard. The page stays as-is — you just get a clean link to share.
+Click the Sanitize It icon on any page to strip tracking parameters and copy the clean URL to your clipboard. By default, the page stays as-is — you just get a clean link to share.
 
-Want to also refresh the page with the clean URL? Use **Shift+Click** (Firefox) or the keyboard shortcut.
+Prefer to also refresh the page with the clean URL? You can change the default click behavior in **Settings** (right-click the extension icon → Options). **Shift+Click** (Firefox) always does the opposite of your chosen default.
+
+You can also use keyboard shortcuts for either action — see below.
 
 ![CleanShot 2024-08-05 at 22 12 19@2x](https://github.com/user-attachments/assets/3532bcce-1974-4915-8b28-11cdeb7a39d8)
 
@@ -40,7 +42,8 @@ Sanitize It 2.0 is a single codebase that supports both Chrome and Firefox (and 
 | Feature | Chrome / Edge | Firefox |
 |---|---|---|
 | Click to sanitize + copy | Yes | Yes |
-| Shift+Click to refresh | No (Chrome limitation) | Yes |
+| Configurable default action | Yes | Yes |
+| Shift+Click to invert default | No (Chrome limitation) | Yes |
 | Keyboard shortcuts | Yes | Yes |
 | Minimum version | Chrome 88+ | Firefox 121+ |
 
@@ -70,9 +73,11 @@ Sanitize It requests a few permissions in the `manifest.json` file.
 
 `tabs` allows the extension access to the tabs API, allowing it to interact with the browser's tab system. This permission is used to query the active tab for keyboard shortcut commands.
 
+`storage` allows the extension to save your preferences (like the default click behavior) using the browser's built-in extension storage. This data syncs across your devices if you're signed into your browser.
+
 #### Privacy
 
-Sanitize It runs completely locally in your browser. It does not collect any analytics, it does not store any information about your tabs or browser history, it does not send any data back for processing or analysis. Your data is yours and yours alone.
+Sanitize It runs completely locally in your browser. The only data it stores is your settings preference (default click behavior), which is kept in your browser's extension storage. It does not collect any analytics, it does not store any information about your tabs or browser history, it does not send any data back for processing or analysis. Your data is yours and yours alone.
 
 ## Installing Sanitize It
 

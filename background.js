@@ -24,11 +24,16 @@ api.runtime.onInstalled.addListener((details) => {
 });
 api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanitizeit');
 
-// Icon click: copy only (Firefox Shift+Click = copy + refresh)
+// Icon click: behaviour depends on user preference (Shift inverts the default)
 api.action.onClicked.addListener((tab, info) => {
-  const shouldRefresh = !!(info && info.modifiers && info.modifiers.includes('Shift'));
-  console.log('Extension icon clicked' + (shouldRefresh ? ' (Shift+Click)' : ''));
-  sanitize(tab, shouldRefresh);
+  const shiftHeld = !!(info && info.modifiers && info.modifiers.includes('Shift'));
+
+  api.storage.sync.get({ defaultAction: 'copy' }).then((result) => {
+    const defaultIsRefresh = result.defaultAction === 'copyRefresh';
+    const shouldRefresh = shiftHeld ? !defaultIsRefresh : defaultIsRefresh;
+    console.log('Extension icon clicked (default=' + result.defaultAction + (shiftHeld ? ', Shift' : '') + ')');
+    sanitize(tab, shouldRefresh);
+  });
 });
 
 // Keyboard shortcuts (work on both Chrome and Firefox)
