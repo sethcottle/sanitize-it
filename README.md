@@ -22,6 +22,7 @@ Sanitize It includes keyboard shortcuts for power users. These work on all suppo
 |---|---|---|
 | **Sanitize + Copy** | `Option + Shift + X` | `Alt + Shift + X` |
 | **Sanitize + Copy + Refresh** | `Option + Shift + R` | `Alt + Shift + R` |
+| **Open Settings** | `Option + Shift + S` | `Alt + Shift + S` |
 
 You can customize these shortcuts:
 - **Chrome:** `chrome://extensions/shortcuts`
@@ -57,6 +58,7 @@ Sanitize It 2.0 is a single codebase that supports both Chrome and Firefox (and 
 | Configurable default action | Yes | Yes |
 | Smart mode | Yes | Yes |
 | Shift+Click to invert default | No (Chrome limitation) | Yes |
+| Alt+Click to open settings | No (Chrome limitation) | Yes |
 | Keyboard shortcuts | Yes | Yes |
 | Minimum version | Chrome 88+ | Firefox 121+ |
 

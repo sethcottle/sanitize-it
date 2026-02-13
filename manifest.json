@@ -41,6 +41,12 @@
         "default": "Alt+Shift+R"
       },
       "description": "Sanitize URL, copy to clipboard, and refresh"
+    },
+    "open-settings": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Open Sanitize It settings"
     }
   }
 }

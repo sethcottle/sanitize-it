@@ -68,6 +68,12 @@ cat > "$DIST_DIR/chrome/manifest.json" << EOF
         "default": "Alt+Shift+R"
       },
       "description": "Sanitize URL, copy to clipboard, and refresh"
+    },
+    "open-settings": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Open Sanitize It settings"
     }
   }
 }
@@ -104,7 +110,7 @@ cat > "$DIST_DIR/firefox/manifest.json" << EOF
   },
   "options_ui": {
     "page": "options.html",
-    "open_in_tab": true
+    "open_in_tab": false
   },
   "commands": {
     "sanitize-copy": {
@@ -118,6 +124,12 @@ cat > "$DIST_DIR/firefox/manifest.json" << EOF
         "default": "Alt+Shift+R"
       },
       "description": "Sanitize URL, copy to clipboard, and refresh"
+    },
+    "open-settings": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Open Sanitize It settings"
     }
   },
   "browser_specific_settings": {

@@ -25,8 +25,16 @@ api.runtime.onInstalled.addListener((details) => {
 api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanitizeit');
 
 // Icon click: behaviour depends on user preference (Shift inverts the default)
+// Alt+Click (Firefox) opens settings directly
 api.action.onClicked.addListener((tab, info) => {
-  const shiftHeld = !!(info && info.modifiers && info.modifiers.includes('Shift'));
+  const modifiers = (info && info.modifiers) || [];
+  const shiftHeld = modifiers.includes('Shift');
+  const altHeld = modifiers.includes('Alt');
+
+  if (altHeld) {
+    api.runtime.openOptionsPage();
+    return;
+  }
 
   api.storage.sync.get({ defaultAction: 'copy', smartMode: true }).then((result) => {
     const defaultIsRefresh = result.defaultAction === 'copyRefresh';
@@ -38,6 +46,10 @@ api.action.onClicked.addListener((tab, info) => {
 
 // Keyboard shortcuts (work on both Chrome and Firefox)
 api.commands.onCommand.addListener((command) => {
+  if (command === 'open-settings') {
+    api.runtime.openOptionsPage();
+    return;
+  }
   api.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
     if (tabs[0]) {
       const shouldRefresh = command === 'sanitize-refresh';
