@@ -6,11 +6,13 @@ Sanitize It allows you to quickly remove tracking information from the current p
 
 ## How It Works
 
-Click the Sanitize It icon on any page to strip tracking parameters and copy the clean URL to your clipboard. The page stays as-is — you just get a clean link to share.
+Click the Sanitize It icon on any page to strip tracking parameters and copy the clean URL to your clipboard. By default, the page stays as-is — you just get a clean link to share.
 
-Want to also refresh the page with the clean URL? Use **Shift+Click** (Firefox) or the keyboard shortcut.
+Prefer to also refresh the page with the clean URL? You can change the default click behavior in **Settings** (right-click the extension icon → Options). **Shift+Click** (Firefox) always does the opposite of your chosen default.
 
-![CleanShot 2024-08-05 at 22 12 19@2x](https://github.com/user-attachments/assets/3532bcce-1974-4915-8b28-11cdeb7a39d8)
+You can also use keyboard shortcuts for either action—see below.
+
+![Toasts](https://cdn.cottle.cloud/tinyextensions/toasts.gif)
 
 ## Keyboard Shortcuts
 
@@ -26,10 +28,22 @@ You can customize these shortcuts:
 - **Firefox:** `about:addons` → gear icon → Manage Extension Shortcuts
 - **Edge:** `edge://extensions/shortcuts`
 
+## Settings & Smart Mode
+
+The Sanitize It settings panel (`right-click` the extension icon → `Options`) let's you choose the default behavior when you `left click` the Sanitize It icon. 
+
+Smart mode is enabled by default. It strips tracking parameters while preserving the ones that actually make the page work. For example, on YouTube it keeps the video ID (`v=`) and playlist info but removes tracking like `si=` and `feature=`.
+
+Supported sites include `YouTube`, `Google`, `Kagi`, `Bing`, `DuckDuckGo`, `Yahoo`, and `Amazon`. Sites not on the list get full aggressive cleaning. This list is relatively small, please open an issue if you would like an additional site supported with what information you can.
+
+You can turn smart mode off in **Settings** if you prefer to strip everything from every site.
+
+![Settings](https://cdn.cottle.cloud/tinyextensions/settings.gif)
+
 ## What Gets Removed
 
 Sanitize It strips the following from URLs:
-- **Query parameters** — everything after `?` (e.g., `?utm_source=...`, `?ref=...`, `?fbclid=...`)
+- **Query parameters** — everything after `?` (e.g., `?utm_source=...`, `?ref=...`, `?fbclid=...`). With smart mode on, essential parameters are preserved on supported sites.
 - **Ref paths** — `/ref/...` and `/ref=...` segments in the URL path (common on Amazon)
 - **Hash fragments** — everything after `#`
 
@@ -40,7 +54,9 @@ Sanitize It 2.0 is a single codebase that supports both Chrome and Firefox (and 
 | Feature | Chrome / Edge | Firefox |
 |---|---|---|
 | Click to sanitize + copy | Yes | Yes |
-| Shift+Click to refresh | No (Chrome limitation) | Yes |
+| Configurable default action | Yes | Yes |
+| Smart mode | Yes | Yes |
+| Shift+Click to invert default | No (Chrome limitation) | Yes |
 | Keyboard shortcuts | Yes | Yes |
 | Minimum version | Chrome 88+ | Firefox 121+ |
 
@@ -70,9 +86,11 @@ Sanitize It requests a few permissions in the `manifest.json` file.
 
 `tabs` allows the extension access to the tabs API, allowing it to interact with the browser's tab system. This permission is used to query the active tab for keyboard shortcut commands.
 
+`storage` allows the extension to save your preferences (like the default click behavior and smart mode) using the browser's built-in extension storage. This data syncs across your devices if you're signed into your browser.
+
 #### Privacy
 
-Sanitize It runs completely locally in your browser. It does not collect any analytics, it does not store any information about your tabs or browser history, it does not send any data back for processing or analysis. Your data is yours and yours alone.
+Sanitize It runs completely locally in your browser. The only data it stores are your settings preferences (default click behavior and smart mode), which are kept in your browser's extension storage. It does not collect any analytics, it does not store any information about your tabs or browser history, it does not send any data back for processing or analysis. Your data is yours and yours alone.
 
 ## Installing Sanitize It
 

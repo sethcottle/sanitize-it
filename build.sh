@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST_DIR="$SCRIPT_DIR/dist"
-SHARED_FILES="background.js icon16.png icon48.png icon128.png"
+SHARED_FILES="background.js options.html options.css options.js icon16.png icon48.png icon128.png"
 
 # Read version from root manifest.json
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/manifest.json")
@@ -34,7 +34,8 @@ cat > "$DIST_DIR/chrome/manifest.json" << EOF
     "activeTab",
     "scripting",
     "clipboardWrite",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "action": {
     "default_icon": {
@@ -50,6 +51,10 @@ cat > "$DIST_DIR/chrome/manifest.json" << EOF
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "commands": {
     "sanitize-copy": {
@@ -79,7 +84,8 @@ cat > "$DIST_DIR/firefox/manifest.json" << EOF
     "activeTab",
     "scripting",
     "clipboardWrite",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "action": {
     "default_icon": {
@@ -95,6 +101,10 @@ cat > "$DIST_DIR/firefox/manifest.json" << EOF
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "commands": {
     "sanitize-copy": {

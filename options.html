@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sanitize It — Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <div class="options-header">
+      <img src="icon48.png" alt="" class="options-icon">
+      <h1>Sanitize It</h1>
+    </div>
+
+    <div class="options-section">
+      <h2>Default Click Behavior</h2>
+      <p class="options-description">Choose what happens when you click the extension icon.</p>
+
+      <label class="option-row">
+        <input type="radio" name="defaultAction" value="copy">
+        <span class="option-label">
+          <strong>Copy only</strong>
+          <span class="option-detail">Sanitize the URL and copy it to your clipboard</span>
+        </span>
+      </label>
+
+      <label class="option-row">
+        <input type="radio" name="defaultAction" value="copyRefresh">
+        <span class="option-label">
+          <strong>Copy + Refresh</strong>
+          <span class="option-detail">Sanitize the URL, copy it, and refresh the page</span>
+        </span>
+      </label>
+    </div>
+
+    <div class="options-section">
+      <h2>URL Cleaning</h2>
+      <label class="toggle-row">
+        <span class="option-label">
+          <strong>Smart mode</strong>
+          <span class="option-detail">Preserve functional parameters on known sites (YouTube video IDs, timestamps, Google search queries, etc.)</span>
+        </span>
+        <input type="checkbox" id="smartMode" class="toggle-input">
+        <span class="toggle-track"></span>
+      </label>
+      <p class="toggle-note">When off, all query parameters are removed from every site.</p>
+    </div>
+
+    <p class="options-note">
+      Keyboard shortcuts are not affected by these settings.<br>
+      Alt+Shift+X always copies only. Alt+Shift+R always copies and refreshes.
+    </p>
+
+    <div class="save-indicator" id="saveIndicator">Settings saved</div>
+
+    <div class="options-footer">
+      <span>Built by <a href="https://seth.social" target="_blank" rel="noopener">Seth Cottle</a></span>
+      <span class="footer-sep">&middot;</span>
+      <a href="https://tinyextensions.com/sanitizeit" target="_blank" rel="noopener">Website</a>
+      <span class="footer-sep">&middot;</span>
+      <a href="https://github.com/sethcottle/sanitize-it" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

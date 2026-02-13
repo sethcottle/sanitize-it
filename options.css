@@ -1,0 +1,338 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Light theme (default) */
+:root {
+  --bg: #f5f5f5;
+  --card-bg: #fff;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  --heading: #111;
+  --text: #333;
+  --text-secondary: #666;
+  --text-muted: #999;
+  --text-faint: #bbb;
+  --radio-border: #ccc;
+  --radio-checked: #111;
+  --row-hover: rgba(0, 0, 0, 0.03);
+  --divider: rgba(0, 0, 0, 0.06);
+  --link: #666;
+  --link-hover: #111;
+  --sep: #ccc;
+  --toggle-bg: #ccc;
+  --toggle-bg-on: #111;
+  --toggle-knob: #fff;
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111;
+    --card-bg: #1a1a1a;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    --heading: #fff;
+    --text: #e0e0e0;
+    --text-secondary: #999;
+    --text-muted: #666;
+    --text-faint: #555;
+    --radio-border: #444;
+    --radio-checked: #fff;
+    --row-hover: rgba(255, 255, 255, 0.04);
+    --divider: rgba(255, 255, 255, 0.06);
+    --link: #999;
+    --link-hover: #fff;
+    --sep: #333;
+    --toggle-bg: #333;
+    --toggle-bg-on: #fff;
+    --toggle-knob: #111;
+  }
+}
+
+body {
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 60px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+}
+
+.options-container {
+  background: var(--card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+}
+
+/* Header */
+.options-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.options-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.options-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--heading);
+}
+
+/* Section */
+.options-section {
+  margin-bottom: 24px;
+}
+
+.options-section h2 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.options-description {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* Option rows */
+.option-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.option-row:hover {
+  background: var(--row-hover);
+}
+
+.option-row + .option-row {
+  margin-top: 2px;
+}
+
+/* Custom radio button */
+.option-row input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border: 2px solid var(--radio-border);
+  border-radius: 50%;
+  margin-top: 1px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  position: relative;
+}
+
+.option-row input[type="radio"]:checked {
+  border-color: var(--radio-checked);
+}
+
+.option-row input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--radio-checked);
+  border-radius: 50%;
+}
+
+.option-row input[type="radio"]:focus-visible {
+  outline: 2px solid var(--radio-checked);
+  outline-offset: 2px;
+}
+
+.option-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-label strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.option-detail {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Toggle row */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.toggle-row:hover {
+  background: var(--row-hover);
+}
+
+/* Toggle switch */
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  background: var(--toggle-bg);
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--toggle-knob);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.toggle-input:checked + .toggle-track {
+  background: var(--toggle-bg-on);
+}
+
+.toggle-input:checked + .toggle-track::after {
+  transform: translateX(16px);
+}
+
+.toggle-input:focus-visible + .toggle-track {
+  outline: 2px solid var(--radio-checked);
+  outline-offset: 2px;
+}
+
+.toggle-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin-top: 8px;
+  padding-left: 14px;
+}
+
+/* Note */
+.options-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-faint);
+  line-height: 1.6;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+}
+
+/* Footer */
+.options-footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.options-footer a {
+  color: var(--link);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.options-footer a:hover {
+  color: var(--link-hover);
+}
+
+.footer-sep {
+  color: var(--sep);
+}
+
+/* Save toast — matches the in-page toast from background.js */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.96); }
+}
+
+.save-indicator {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 40, 20, 0.88);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  color: #6FCF6A;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18),
+              0 1px 3px rgba(0, 0, 0, 0.12),
+              inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(111, 207, 106, 0.15);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.save-indicator.visible {
+  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.save-indicator.hiding {
+  animation: toast-out 0.35s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
