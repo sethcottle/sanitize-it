@@ -24,6 +24,15 @@ api.runtime.onInstalled.addListener((details) => {
 });
 api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanitizeit');
 
+// Smart-mode sub-options: opt-in behaviors layered on top of smart mode. Stored under
+// the `smartOptions` key; these defaults are merged with whatever the user has saved, so
+// adding a new option here keeps older saved settings working (missing key -> default).
+const SMART_OPTION_DEFAULTS = {
+  youtubePlaylist: false,
+  youtubeTimestamp: false,
+  amazonVariant: false,
+};
+
 // Icon click: behaviour depends on user preference (Shift inverts the default)
 // Alt+Click (Firefox) opens settings directly
 api.action.onClicked.addListener((tab, info) => {
@@ -36,11 +45,12 @@ api.action.onClicked.addListener((tab, info) => {
     return;
   }
 
-  api.storage.sync.get({ defaultAction: 'copy', smartMode: true }).then((result) => {
+  api.storage.sync.get({ defaultAction: 'copy', smartMode: true, smartOptions: {} }).then((result) => {
     const defaultIsRefresh = result.defaultAction === 'copyRefresh';
     const shouldRefresh = shiftHeld ? !defaultIsRefresh : defaultIsRefresh;
+    const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
     console.log('Extension icon clicked (default=' + result.defaultAction + (shiftHeld ? ', Shift' : '') + ')');
-    sanitize(tab, shouldRefresh, result.smartMode);
+    sanitize(tab, shouldRefresh, result.smartMode, smartOptions);
   });
 });
 
@@ -54,8 +64,9 @@ api.commands.onCommand.addListener((command) => {
     if (tabs[0]) {
       const shouldRefresh = command === 'sanitize-refresh';
       console.log('Command: ' + command);
-      api.storage.sync.get({ smartMode: true }).then((result) => {
-        sanitize(tabs[0], shouldRefresh, result.smartMode);
+      api.storage.sync.get({ smartMode: true, smartOptions: {} }).then((result) => {
+        const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
+        sanitize(tabs[0], shouldRefresh, result.smartMode, smartOptions);
       });
     }
   });
@@ -79,7 +90,8 @@ const SITE_RULES = {
 // Amazon has dozens of country domains (amazon.com, amazon.co.uk, amazon.de, ...),
 // so they're matched by pattern instead of listed individually.
 // th/psc pin the selected size/color variant, node identifies category pages,
-// k/s are the search query and sort order.
+// k/s are the search query and sort order. The product itself is the /dp/<ASIN>
+// path segment, which is never stripped, not a query parameter.
 const AMAZON_HOSTNAME = /(^|\.)amazon\.[a-z]{2,3}(\.[a-z]{2})?$/;
 const AMAZON_PARAMS = ['k', 's', 'th', 'psc', 'node'];
 
@@ -93,16 +105,35 @@ function getAllowedParams(hostname) {
   return null;
 }
 
-function sanitize(tab, shouldRefresh, smartMode) {
+function sanitize(tab, shouldRefresh, smartMode, smartOptions = {}) {
   let url = new URL(tab.url);
   const originalUrl = tab.url;
   const hostname = url.hostname;
-  const allowed = getAllowedParams(hostname);
+  let allowed = getAllowedParams(hostname);
   let usedSmartMode = false;
 
   if (smartMode !== false && allowed) {
     // Keep only allowlisted params for this site
     usedSmartMode = true;
+
+    // Opt-in smart-mode sub-options remove otherwise-kept params for an even cleaner link.
+    const ytHosts = ['www.youtube.com', 'youtube.com', 'music.youtube.com', 'youtu.be'];
+    if (ytHosts.includes(hostname)) {
+      // Playlist context only exists on watch links (?v=); /playlist and album pages have
+      // no `v`, so their list param is always preserved.
+      if (smartOptions.youtubePlaylist && url.searchParams.has('v')) {
+        allowed = allowed.filter((p) => p !== 'list' && p !== 'index');
+      }
+      // Drop the start time (t=) so the link opens at the beginning of the video.
+      if (smartOptions.youtubeTimestamp) {
+        allowed = allowed.filter((p) => p !== 't');
+      }
+    }
+    // Drop Amazon's variant flags (th/psc) for the canonical product link. The item is
+    // still identified by the /dp/<ASIN> path; this just removes the pre-selected offer.
+    if (smartOptions.amazonVariant && AMAZON_HOSTNAME.test(hostname)) {
+      allowed = allowed.filter((p) => p !== 'th' && p !== 'psc');
+    }
     const filtered = new URLSearchParams();
     for (const [key, value] of url.searchParams) {
       if (allowed.includes(key)) {
