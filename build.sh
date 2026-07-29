@@ -35,7 +35,8 @@ cat > "$DIST_DIR/chrome/manifest.json" << EOF
     "scripting",
     "clipboardWrite",
     "tabs",
-    "storage"
+    "storage",
+    "contextMenus"
   ],
   "action": {
     "default_icon": {
@@ -91,7 +92,8 @@ cat > "$DIST_DIR/firefox/manifest.json" << EOF
     "scripting",
     "clipboardWrite",
     "tabs",
-    "storage"
+    "storage",
+    "contextMenus"
   ],
   "action": {
     "default_icon": {

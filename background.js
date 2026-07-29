@@ -24,6 +24,61 @@ api.runtime.onInstalled.addListener((details) => {
 });
 api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanitizeit');
 
+// Right-click menu: the sanitize actions plus Settings, on both the page and
+// the toolbar button. With multiple items every browser nests them under a
+// "Sanitize It" submenu (1Password-style). This is also the only in-product
+// path to Settings on Safari (no Options item on the toolbar button and,
+// before Safari 26, no settings button in its extensions pane) and a one-hop
+// shortcut past Firefox's Manage Extension → Preferences flow. A context menu
+// click counts as user intent, so activeTab covers the injection just like an
+// icon click. Runs on every worker start; removeAll keeps it idempotent.
+// The sanitize items only show on http(s) pages — injection is impossible on
+// browser UI, extension pages, and the Web Store. Settings works anywhere.
+const HTTP_PATTERNS = ['http://*/*', 'https://*/*'];
+const MENU_ITEMS = [
+  { id: 'menu-sanitize-copy', title: 'Copy Sanitized URL', documentUrlPatterns: HTTP_PATTERNS },
+  { id: 'menu-sanitize-refresh', title: 'Copy Sanitized URL & Refresh', documentUrlPatterns: HTTP_PATTERNS },
+  { id: 'menu-separator', type: 'separator' },
+  { id: 'menu-open-settings', title: 'Settings…' },
+];
+
+async function registerContextMenus() {
+  if (!api.contextMenus) return;
+  try {
+    await api.contextMenus.removeAll();
+    let contexts = ['action', 'page'];
+    try {
+      MENU_ITEMS.forEach((item) => api.contextMenus.create({ ...item, contexts }));
+    } catch (error) {
+      // Older engines that don't know the 'action' context
+      await api.contextMenus.removeAll();
+      contexts = ['page'];
+      MENU_ITEMS.forEach((item) => api.contextMenus.create({ ...item, contexts }));
+    }
+  } catch (error) {
+    console.log('Context menu registration failed: ' + error.message);
+  }
+}
+registerContextMenus();
+
+if (api.contextMenus && api.contextMenus.onClicked) {
+  api.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === 'menu-open-settings') {
+      api.runtime.openOptionsPage();
+      return;
+    }
+    if (info.menuItemId === 'menu-sanitize-copy' || info.menuItemId === 'menu-sanitize-refresh') {
+      if (!tab || !tab.url) return;
+      const shouldRefresh = info.menuItemId === 'menu-sanitize-refresh';
+      api.storage.sync.get({ smartMode: true, smartOptions: {} }).then((result) => {
+        const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
+        console.log('Context menu: ' + info.menuItemId);
+        sanitize(tab, shouldRefresh, result.smartMode, smartOptions);
+      });
+    }
+  });
+}
+
 // Smart-mode sub-options: opt-in behaviors layered on top of smart mode. Stored under
 // the `smartOptions` key; these defaults are merged with whatever the user has saved, so
 // adding a new option here keeps older saved settings working (missing key -> default).
@@ -45,12 +100,19 @@ api.action.onClicked.addListener((tab, info) => {
     return;
   }
 
-  api.storage.sync.get({ defaultAction: 'copy', smartMode: true, smartOptions: {} }).then((result) => {
+  api.storage.sync.get({ defaultAction: 'copy', smartMode: true, smartOptions: {} }).then(async (result) => {
     const defaultIsRefresh = result.defaultAction === 'copyRefresh';
     const shouldRefresh = shiftHeld ? !defaultIsRefresh : defaultIsRefresh;
     const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
     console.log('Extension icon clicked (default=' + result.defaultAction + (shiftHeld ? ', Shift' : '') + ')');
-    sanitize(tab, shouldRefresh, result.smartMode, smartOptions);
+    // Safari can hand onClicked a tab object without a url — re-query the
+    // active tab (the click already granted activeTab) instead of bailing
+    let targetTab = tab;
+    if (!targetTab || !targetTab.url) {
+      const tabs = await api.tabs.query({ active: true, currentWindow: true });
+      targetTab = tabs[0];
+    }
+    sanitize(targetTab, shouldRefresh, result.smartMode, smartOptions);
   });
 });
 
@@ -106,6 +168,12 @@ function getAllowedParams(hostname) {
 }
 
 function sanitize(tab, shouldRefresh, smartMode, smartOptions = {}) {
+  // Nothing to sanitize (and nowhere to inject) on browser UI, extension
+  // pages, PDFs, etc. — icon clicks and shortcuts can still land here
+  if (!tab || !tab.url || !/^https?:/.test(tab.url)) {
+    console.log('Skipping sanitize — not an http(s) page (url=' + (tab && tab.url ? tab.url : 'unavailable') + ')');
+    return;
+  }
   let url = new URL(tab.url);
   const originalUrl = tab.url;
   const hostname = url.hostname;
@@ -172,6 +240,10 @@ function sanitize(tab, shouldRefresh, smartMode, smartOptions = {}) {
     target: { tabId: tab.id },
     func: copyAndNotify,
     args: [sanitizedUrl, shouldRefresh, usedSmartMode, wasChanged]
+  }).catch((error) => {
+    // Restricted pages that slip past the protocol guard — log instead of
+    // surfacing an uncaught rejection in the extensions error console
+    console.log('Injection failed: ' + error.message);
   });
 }
 
