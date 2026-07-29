@@ -256,6 +256,33 @@ body {
   padding-left: 14px;
 }
 
+/* Smart mode sub-options (opt-in behaviors nested under Smart mode) */
+.smart-suboptions {
+  margin-top: 12px;
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 2px solid var(--divider);
+  transition: opacity 0.15s ease;
+}
+
+.smart-suboptions:empty {
+  display: none;
+}
+
+.smart-suboptions.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.suboption-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0 0 4px 14px;
+}
+
 /* Note */
 .options-note {
   font-size: 11px;

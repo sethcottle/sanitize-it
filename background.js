@@ -24,6 +24,70 @@ api.runtime.onInstalled.addListener((details) => {
 });
 api.runtime.setUninstallURL('https://tinyextensions.com/uninstall.html?ext=sanitizeit');
 
+// Right-click menu: the sanitize actions plus Settings, on both the page and
+// the toolbar button. With multiple items every browser nests them under a
+// "Sanitize It" submenu (1Password-style). This is also the only in-product
+// path to Settings on Safari (no Options item on the toolbar button and,
+// before Safari 26, no settings button in its extensions pane) and a one-hop
+// shortcut past Firefox's Manage Extension → Preferences flow. A context menu
+// click counts as user intent, so activeTab covers the injection just like an
+// icon click. Runs on every worker start; removeAll keeps it idempotent.
+// The sanitize items only show on http(s) pages — injection is impossible on
+// browser UI, extension pages, and the Web Store. Settings works anywhere.
+const HTTP_PATTERNS = ['http://*/*', 'https://*/*'];
+const MENU_ITEMS = [
+  { id: 'menu-sanitize-copy', title: 'Copy Sanitized URL', documentUrlPatterns: HTTP_PATTERNS },
+  { id: 'menu-sanitize-refresh', title: 'Copy Sanitized URL & Refresh', documentUrlPatterns: HTTP_PATTERNS },
+  { id: 'menu-separator', type: 'separator' },
+  { id: 'menu-open-settings', title: 'Settings…' },
+];
+
+async function registerContextMenus() {
+  if (!api.contextMenus) return;
+  try {
+    await api.contextMenus.removeAll();
+    let contexts = ['action', 'page'];
+    try {
+      MENU_ITEMS.forEach((item) => api.contextMenus.create({ ...item, contexts }));
+    } catch (error) {
+      // Older engines that don't know the 'action' context
+      await api.contextMenus.removeAll();
+      contexts = ['page'];
+      MENU_ITEMS.forEach((item) => api.contextMenus.create({ ...item, contexts }));
+    }
+  } catch (error) {
+    console.log('Context menu registration failed: ' + error.message);
+  }
+}
+registerContextMenus();
+
+if (api.contextMenus && api.contextMenus.onClicked) {
+  api.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === 'menu-open-settings') {
+      api.runtime.openOptionsPage();
+      return;
+    }
+    if (info.menuItemId === 'menu-sanitize-copy' || info.menuItemId === 'menu-sanitize-refresh') {
+      if (!tab || !tab.url) return;
+      const shouldRefresh = info.menuItemId === 'menu-sanitize-refresh';
+      api.storage.sync.get({ smartMode: true, smartOptions: {} }).then((result) => {
+        const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
+        console.log('Context menu: ' + info.menuItemId);
+        sanitize(tab, shouldRefresh, result.smartMode, smartOptions);
+      });
+    }
+  });
+}
+
+// Smart-mode sub-options: opt-in behaviors layered on top of smart mode. Stored under
+// the `smartOptions` key; these defaults are merged with whatever the user has saved, so
+// adding a new option here keeps older saved settings working (missing key -> default).
+const SMART_OPTION_DEFAULTS = {
+  youtubePlaylist: false,
+  youtubeTimestamp: false,
+  amazonVariant: false,
+};
+
 // Icon click: behaviour depends on user preference (Shift inverts the default)
 // Alt+Click (Firefox) opens settings directly
 api.action.onClicked.addListener((tab, info) => {
@@ -36,11 +100,19 @@ api.action.onClicked.addListener((tab, info) => {
     return;
   }
 
-  api.storage.sync.get({ defaultAction: 'copy', smartMode: true }).then((result) => {
+  api.storage.sync.get({ defaultAction: 'copy', smartMode: true, smartOptions: {} }).then(async (result) => {
     const defaultIsRefresh = result.defaultAction === 'copyRefresh';
     const shouldRefresh = shiftHeld ? !defaultIsRefresh : defaultIsRefresh;
+    const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
     console.log('Extension icon clicked (default=' + result.defaultAction + (shiftHeld ? ', Shift' : '') + ')');
-    sanitize(tab, shouldRefresh, result.smartMode);
+    // Safari can hand onClicked a tab object without a url — re-query the
+    // active tab (the click already granted activeTab) instead of bailing
+    let targetTab = tab;
+    if (!targetTab || !targetTab.url) {
+      const tabs = await api.tabs.query({ active: true, currentWindow: true });
+      targetTab = tabs[0];
+    }
+    sanitize(targetTab, shouldRefresh, result.smartMode, smartOptions);
   });
 });
 
@@ -54,8 +126,9 @@ api.commands.onCommand.addListener((command) => {
     if (tabs[0]) {
       const shouldRefresh = command === 'sanitize-refresh';
       console.log('Command: ' + command);
-      api.storage.sync.get({ smartMode: true }).then((result) => {
-        sanitize(tabs[0], shouldRefresh, result.smartMode);
+      api.storage.sync.get({ smartMode: true, smartOptions: {} }).then((result) => {
+        const smartOptions = { ...SMART_OPTION_DEFAULTS, ...result.smartOptions };
+        sanitize(tabs[0], shouldRefresh, result.smartMode, smartOptions);
       });
     }
   });
@@ -74,26 +147,72 @@ const SITE_RULES = {
   'www.bing.com':      ['q'],
   'duckduckgo.com':    ['q'],
   'kagi.com':          ['q', 'l', 'r', 'order', 'dr', 'verbatim'],
-  'www.amazon.com':    ['dp', 's', 'k'],
-  'www.amazon.co.uk':  ['dp', 's', 'k'],
 };
 
-function sanitize(tab, shouldRefresh, smartMode) {
+// Amazon has dozens of country domains (amazon.com, amazon.co.uk, amazon.de, ...),
+// so they're matched by pattern instead of listed individually.
+// th/psc pin the selected size/color variant, node identifies category pages,
+// k/s are the search query and sort order. The product itself is the /dp/<ASIN>
+// path segment, which is never stripped, not a query parameter.
+const AMAZON_HOSTNAME = /(^|\.)amazon\.[a-z]{2,3}(\.[a-z]{2})?$/;
+const AMAZON_PARAMS = ['k', 's', 'th', 'psc', 'node'];
+
+function getAllowedParams(hostname) {
+  if (SITE_RULES.hasOwnProperty(hostname)) {
+    return SITE_RULES[hostname];
+  }
+  if (AMAZON_HOSTNAME.test(hostname)) {
+    return AMAZON_PARAMS;
+  }
+  return null;
+}
+
+function sanitize(tab, shouldRefresh, smartMode, smartOptions = {}) {
+  // Nothing to sanitize (and nowhere to inject) on browser UI, extension
+  // pages, PDFs, etc. — icon clicks and shortcuts can still land here
+  if (!tab || !tab.url || !/^https?:/.test(tab.url)) {
+    console.log('Skipping sanitize — not an http(s) page (url=' + (tab && tab.url ? tab.url : 'unavailable') + ')');
+    return;
+  }
   let url = new URL(tab.url);
   const originalUrl = tab.url;
   const hostname = url.hostname;
-  const hasRules = SITE_RULES.hasOwnProperty(hostname);
+  let allowed = getAllowedParams(hostname);
   let usedSmartMode = false;
 
-  if (smartMode !== false && hasRules) {
+  if (smartMode !== false && allowed) {
     // Keep only allowlisted params for this site
     usedSmartMode = true;
-    const allowed = SITE_RULES[hostname];
+
+    // Opt-in smart-mode sub-options remove otherwise-kept params for an even cleaner link.
+    const ytHosts = ['www.youtube.com', 'youtube.com', 'music.youtube.com', 'youtu.be'];
+    if (ytHosts.includes(hostname)) {
+      // Playlist context only exists on watch links (?v=); /playlist and album pages have
+      // no `v`, so their list param is always preserved.
+      if (smartOptions.youtubePlaylist && url.searchParams.has('v')) {
+        allowed = allowed.filter((p) => p !== 'list' && p !== 'index');
+      }
+      // Drop the start time (t=) so the link opens at the beginning of the video.
+      if (smartOptions.youtubeTimestamp) {
+        allowed = allowed.filter((p) => p !== 't');
+      }
+    }
+    // Drop Amazon's variant flags (th/psc) for the canonical product link. The item is
+    // still identified by the /dp/<ASIN> path; this just removes the pre-selected offer.
+    if (smartOptions.amazonVariant && AMAZON_HOSTNAME.test(hostname)) {
+      allowed = allowed.filter((p) => p !== 'th' && p !== 'psc');
+    }
     const filtered = new URLSearchParams();
     for (const [key, value] of url.searchParams) {
       if (allowed.includes(key)) {
         filtered.set(key, value);
       }
+    }
+    // YouTube auto-generated mixes (list=RD...) are personalized radio queues,
+    // not shareable playlists — drop them and keep just the video link.
+    if (filtered.has('v') && /^RD/.test(filtered.get('list') || '')) {
+      filtered.delete('list');
+      filtered.delete('index');
     }
     const qs = filtered.toString();
     url.search = qs ? '?' + qs : '';
@@ -102,10 +221,11 @@ function sanitize(tab, shouldRefresh, smartMode) {
     url.search = '';
   }
 
-  // Remove ref parameters from the pathname
-  let newPathname = url.pathname.replace(/\/ref\/.*$/, '');
-  newPathname = newPathname.replace(/\/ref=.*$/, '');
-  url.pathname = newPathname;
+  // Amazon embeds tracking in the path as /ref=... segments. Only strip these
+  // on Amazon domains — other sites use /ref/ legitimately (e.g. docs pages).
+  if (AMAZON_HOSTNAME.test(hostname)) {
+    url.pathname = url.pathname.replace(/\/ref=.*$/, '').replace(/\/ref\/.*$/, '');
+  }
 
   // Remove hash
   url.hash = '';
@@ -120,6 +240,10 @@ function sanitize(tab, shouldRefresh, smartMode) {
     target: { tabId: tab.id },
     func: copyAndNotify,
     args: [sanitizedUrl, shouldRefresh, usedSmartMode, wasChanged]
+  }).catch((error) => {
+    // Restricted pages that slip past the protocol guard — log instead of
+    // surfacing an uncaught rejection in the extensions error console
+    console.log('Injection failed: ' + error.message);
   });
 }
 

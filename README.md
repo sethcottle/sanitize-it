@@ -33,7 +33,13 @@ You can customize these shortcuts:
 
 The Sanitize It settings panel (`right-click` the extension icon → `Options`) let's you choose the default behavior when you `left click` the Sanitize It icon. 
 
-Smart mode is enabled by default. It strips tracking parameters while preserving the ones that actually make the page work. For example, on YouTube it keeps the video ID (`v=`) and playlist info but removes tracking like `si=` and `feature=`.
+Smart mode is enabled by default. It strips tracking parameters while preserving the ones that actually make the page work. For example, on YouTube it keeps the video ID (`v=`), timestamp (`t=`), and playlist info but removes tracking like `si=` and `feature=`.
+
+Smart mode also has a few optional, off-by-default sub-settings for people who want more aggressive cleaning:
+
+- **Strip YouTube playlists** — on a video link, also removes the playlist (`list=`/`index=`) so you get a clean link to just the video. Playlist and album pages keep their `list=` so they still work.
+- **Strip YouTube start times** — removes the start time (`t=`) so the link opens at the beginning of the video.
+- **Strip Amazon variant params** — removes Amazon's `th`/`psc` flags for the canonical product link. The item is still set by the `/dp/<ASIN>` path; this just drops the pre-selected size/color.
 
 Supported sites include `YouTube`, `Google`, `Kagi`, `Bing`, `DuckDuckGo`, `Yahoo`, and `Amazon`. Sites not on the list get full aggressive cleaning. This list is relatively small, please open an issue if you would like an additional site supported with what information you can.
 
