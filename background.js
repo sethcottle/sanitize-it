@@ -74,26 +74,46 @@ const SITE_RULES = {
   'www.bing.com':      ['q'],
   'duckduckgo.com':    ['q'],
   'kagi.com':          ['q', 'l', 'r', 'order', 'dr', 'verbatim'],
-  'www.amazon.com':    ['dp', 's', 'k'],
-  'www.amazon.co.uk':  ['dp', 's', 'k'],
 };
+
+// Amazon has dozens of country domains (amazon.com, amazon.co.uk, amazon.de, ...),
+// so they're matched by pattern instead of listed individually.
+// th/psc pin the selected size/color variant, node identifies category pages,
+// k/s are the search query and sort order.
+const AMAZON_HOSTNAME = /(^|\.)amazon\.[a-z]{2,3}(\.[a-z]{2})?$/;
+const AMAZON_PARAMS = ['k', 's', 'th', 'psc', 'node'];
+
+function getAllowedParams(hostname) {
+  if (SITE_RULES.hasOwnProperty(hostname)) {
+    return SITE_RULES[hostname];
+  }
+  if (AMAZON_HOSTNAME.test(hostname)) {
+    return AMAZON_PARAMS;
+  }
+  return null;
+}
 
 function sanitize(tab, shouldRefresh, smartMode) {
   let url = new URL(tab.url);
   const originalUrl = tab.url;
   const hostname = url.hostname;
-  const hasRules = SITE_RULES.hasOwnProperty(hostname);
+  const allowed = getAllowedParams(hostname);
   let usedSmartMode = false;
 
-  if (smartMode !== false && hasRules) {
+  if (smartMode !== false && allowed) {
     // Keep only allowlisted params for this site
     usedSmartMode = true;
-    const allowed = SITE_RULES[hostname];
     const filtered = new URLSearchParams();
     for (const [key, value] of url.searchParams) {
       if (allowed.includes(key)) {
         filtered.set(key, value);
       }
+    }
+    // YouTube auto-generated mixes (list=RD...) are personalized radio queues,
+    // not shareable playlists — drop them and keep just the video link.
+    if (filtered.has('v') && /^RD/.test(filtered.get('list') || '')) {
+      filtered.delete('list');
+      filtered.delete('index');
     }
     const qs = filtered.toString();
     url.search = qs ? '?' + qs : '';
@@ -102,10 +122,11 @@ function sanitize(tab, shouldRefresh, smartMode) {
     url.search = '';
   }
 
-  // Remove ref parameters from the pathname
-  let newPathname = url.pathname.replace(/\/ref\/.*$/, '');
-  newPathname = newPathname.replace(/\/ref=.*$/, '');
-  url.pathname = newPathname;
+  // Amazon embeds tracking in the path as /ref=... segments. Only strip these
+  // on Amazon domains — other sites use /ref/ legitimately (e.g. docs pages).
+  if (AMAZON_HOSTNAME.test(hostname)) {
+    url.pathname = url.pathname.replace(/\/ref=.*$/, '').replace(/\/ref\/.*$/, '');
+  }
 
   // Remove hash
   url.hash = '';
